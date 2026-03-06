@@ -1,0 +1,17 @@
+[project]
+name = "mistral-ocr-extractor"
+version = "0.1.0"
+description = "Extract structured markdown and images from PDFs using Mistral OCR with annotations"
+requires-python = ">=3.12"
+dependencies = [
+    "mistralai>=1.6.0",
+    "pydantic>=2.0",
+    "python-dotenv>=1.0",
+]
+
+[project.scripts]
+extract = "mistral_ocr_extractor.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
