@@ -25,8 +25,8 @@ class FileWriteError(ExtractorError):
     """Raised when writing output files to disk fails."""
 
 
-class PDFDiscoveryError(ExtractorError):
-    """Raised when the source folder has no PDF files or doesn't exist."""
+class FileDiscoveryError(ExtractorError):
+    """Raised when the source folder has no supported files or doesn't exist."""
 
 
 class AnnotationParseError(ExtractorError):

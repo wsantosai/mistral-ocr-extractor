@@ -62,16 +62,19 @@ def _strip_data_uri_prefix(raw_base64: str) -> tuple[str, str | None]:
 
 class OCRService:
     """
-    Processes PDFs through Mistral OCR with document and bbox annotations.
+    Processes PDFs and images through Mistral OCR with annotations.
 
-    Handles the 8-page limit for document annotations by:
+    For PDFs, handles the 8-page limit for document annotations by:
     1. First call: pages 0-7 with BOTH annotation types enabled.
     2. Subsequent calls: remaining pages with ONLY bbox annotations.
     3. Merges all page results into a single DocumentResult.
 
+    For images, sends a single API call with bbox annotations only.
+
     Usage:
         service = OCRService(settings)
         result = service.process_pdf(Path("document.pdf"))
+        result = service.process_image(Path("photo.jpg"))
 
     Raises:
         OCRAPIError: If any Mistral API call fails.
@@ -153,6 +156,75 @@ class OCRService:
             pages=all_pages,
             document_annotation=document_annotation,
         )
+
+    def process_image(self, image_path: Path) -> DocumentResult:
+        """
+        Process a single image file through Mistral OCR with bbox annotations.
+
+        Args:
+            image_path: Path to the image file (jpg, png, gif, webp).
+
+        Returns:
+            DocumentResult with a single page and bbox annotations.
+
+        Raises:
+            OCRAPIError: If the Mistral API call fails.
+            ImageDecodeError: If image decoding fails.
+        """
+        logger.info("Processing image: %s", image_path.name)
+        start = time.monotonic()
+
+        mime_type = _detect_mime_type(image_path.name)
+        img_base64 = base64.b64encode(image_path.read_bytes()).decode("utf-8")
+        image_url = f"data:{mime_type};base64,{img_base64}"
+
+        response = self._call_ocr_image(image_url=image_url)
+
+        all_pages = self._extract_pages(response)
+        image_count = sum(len(p.images) for p in all_pages)
+        elapsed_ms = int((time.monotonic() - start) * 1000)
+
+        logger.info(
+            "Completed %s: %d pages, %d images in %dms",
+            image_path.name,
+            len(all_pages),
+            image_count,
+            elapsed_ms,
+        )
+
+        return DocumentResult(
+            source_filename=image_path.name,
+            page_count=len(all_pages),
+            image_count=image_count,
+            pages=all_pages,
+            document_annotation=getattr(response, "document_annotation", None),
+        )
+
+    def _call_ocr_image(self, image_url: str):
+        """
+        Make a single call to the Mistral OCR API with an image input.
+
+        Raises:
+            OCRAPIError: If the API call fails.
+        """
+        kwargs: dict = {
+            "model": self.MODEL,
+            "document": {
+                "type": "image_url",
+                "image_url": image_url,
+            },
+            "include_image_base64": True,
+            "bbox_annotation_format": self._bbox_format,
+            "document_annotation_format": self._doc_format,
+        }
+
+        try:
+            return self._client.ocr.process(**kwargs)
+        except SDKError as e:
+            raise OCRAPIError(
+                f"Mistral OCR API error for image: {e}",
+                status_code=getattr(e, "status_code", None),
+            ) from e
 
     def _call_ocr(
         self,

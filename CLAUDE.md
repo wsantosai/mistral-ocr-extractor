@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-CLI tool that extracts structured markdown and images from PDFs using the Mistral OCR API with annotation support (document-level and per-image bounding box annotations). Built for processing UNIR university course material PDFs.
+CLI tool that extracts structured markdown and images from PDFs and image files using the Mistral OCR API with annotation support (document-level and per-image bounding box annotations). Built for processing UNIR university course material. Supports PDF, JPG, JPEG, PNG, GIF, and WebP inputs.
 
 ## Commands
 
@@ -13,13 +13,14 @@ CLI tool that extracts structured markdown and images from PDFs using the Mistra
 uv sync
 
 # Run the extractor
-uv run extract --path <folder-with-pdfs> [--name <project-name>] [-v]
+uv run extract --path <folder-with-pdfs-and-images> [--name <project-name>] [-v]
 
 # Example
 uv run extract --path ./pdfs --name "my-course" --verbose
-```
 
-There is no test suite or linter configured.
+# Run tests
+uv run pytest tests/ -v
+```
 
 ## Architecture
 
@@ -27,9 +28,9 @@ The project follows a service-oriented pattern with three services orchestrated 
 
 **Pipeline flow:** `CLI → OCRService → MarkdownService → FileService`
 
-1. **`cli.py`** — Entry point (`extract` command). Discovers PDFs in the given folder, iterates over them, skips already-processed ones (checks for existing `content.md`), and orchestrates the three services.
+1. **`cli.py`** — Entry point (`extract` command). Discovers PDFs and images in the given folder, routes each file to the appropriate OCR method (`process_pdf` or `process_image`), skips already-processed ones (checks for existing `content.md`), and orchestrates the three services.
 
-2. **`services/ocr_service.py`** — Calls Mistral OCR API. Handles the **8-page limit for document annotations** by splitting into two API calls: pages 0-7 with both annotation types, then remaining pages with bbox annotations only. Decodes base64 images from the response.
+2. **`services/ocr_service.py`** — Calls Mistral OCR API. For PDFs, handles the **8-page limit for document annotations** by splitting into two API calls: pages 0-7 with both annotation types, then remaining pages with bbox annotations only. For images, sends a single API call with `ImageURLChunk` and bbox annotations. Decodes base64 images from the response.
 
 3. **`services/markdown_service.py`** — Builds a markdown document with TOML frontmatter (source metadata + document annotation) and page-separated content. Rewrites image paths to `images/` subfolder and inserts bbox annotations as HTML comments.
 
@@ -41,8 +42,8 @@ The project follows a service-oriented pattern with three services orchestrated 
 
 **Output structure:**
 ```
-output/<project_name>/<sanitized_pdf_name>/content.md
-output/<project_name>/<sanitized_pdf_name>/images/img-0.jpeg
+output/<project_name>/<sanitized_name>/content.md
+output/<project_name>/<sanitized_name>/images/img-0.jpeg
 ```
 
 ## Configuration

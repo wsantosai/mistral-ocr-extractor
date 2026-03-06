@@ -1,14 +1,16 @@
 # Mistral OCR Extractor
 
-CLI tool that extracts structured markdown and images from PDF files using the [Mistral OCR API](https://docs.mistral.ai/capabilities/document/). Designed for batch-processing university course material (UNIR), it produces clean markdown with TOML frontmatter, extracted images, and AI-generated annotations.
+CLI tool that extracts structured markdown and images from PDF and image files using the [Mistral OCR API](https://docs.mistral.ai/capabilities/document/). Designed for batch-processing university course material (UNIR), it produces clean markdown with TOML frontmatter, extracted images, and AI-generated annotations.
+
+**Supported formats:** PDF, JPG, JPEG, PNG, GIF, WebP
 
 ## Features
 
-- **Batch PDF processing** — Point at a folder and extract all PDFs at once
+- **Batch processing** — Point at a folder and extract all PDFs and images at once
 - **Structured annotations** — Document-level summaries (language, topics, summary) and per-image bounding box annotations (type, description) via Mistral's structured output
 - **Clean markdown output** — TOML frontmatter with metadata, page-separated content, and image references
 - **Image extraction** — All embedded images decoded and saved alongside the markdown
-- **Incremental processing** — Already-processed PDFs are automatically skipped
+- **Incremental processing** — Already-processed files are automatically skipped
 - **UNIR filename cleanup** — Strips numeric prefixes and language suffixes from UNIR PDF filenames
 
 ## Requirements
@@ -35,7 +37,7 @@ cp .env.example .env
 ## Usage
 
 ```bash
-# Basic usage — process all PDFs in a folder
+# Basic usage — process all PDFs and images in a folder
 uv run extract --path ./my-pdfs
 
 # Specify a project name for the output folder
@@ -43,13 +45,16 @@ uv run extract --path ./my-pdfs --name "my-course"
 
 # Enable verbose logging
 uv run extract --path ./my-pdfs --name "my-course" --verbose
+
+# Run tests
+uv run pytest tests/ -v
 ```
 
 ### CLI Options
 
 | Option | Required | Description |
 |---|---|---|
-| `--path` | Yes | Path to folder containing PDF files |
+| `--path` | Yes | Path to folder containing PDF and/or image files |
 | `--name` | No | Project name for the output folder (defaults to parent folder name of `--path`) |
 | `--verbose`, `-v` | No | Enable debug-level logging |
 
@@ -90,10 +95,10 @@ topics = ["supervised learning", "neural networks"]
 
 ## How It Works
 
-1. **Discovery** — Finds all `.pdf` files in the specified folder
-2. **OCR with annotations** — Sends each PDF to Mistral OCR API:
-   - First 8 pages: both document-level and bounding box annotations
-   - Remaining pages: bounding box annotations only (Mistral's document annotation limit)
+1. **Discovery** — Finds all supported files (`.pdf`, `.jpg`, `.jpeg`, `.png`, `.gif`, `.webp`) in the specified folder
+2. **OCR with annotations** — Sends each file to Mistral OCR API:
+   - **PDFs**: First 8 pages with both document-level and bounding box annotations, remaining pages with bbox annotations only (Mistral's document annotation limit)
+   - **Images**: Single API call with bounding box annotations
 3. **Markdown generation** — Assembles TOML frontmatter + page content with image paths rewritten to the local `images/` subfolder
 4. **File output** — Writes `content.md` and all extracted images to disk
 
